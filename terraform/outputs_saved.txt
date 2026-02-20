@@ -1,0 +1,5 @@
+api_gateway_url = "https://oj6pwu8j86.execute-api.ca-central-1.amazonaws.com/dev"
+exports_bucket = "reviewpulse-exports-f020c3de"
+feedback_table_name = "reviewpulse-feedback"
+frontend_bucket = "reviewpulse-frontend-f020c3de"
+frontend_website_endpoint = "reviewpulse-frontend-f020c3de.s3-website.ca-central-1.amazonaws.com"

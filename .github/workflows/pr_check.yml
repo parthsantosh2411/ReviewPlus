@@ -1,0 +1,40 @@
+name: PR Validation Check
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate:
+    name: Validate Pull Request
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: pip install -r backend/requirements.txt
+
+      - name: Validate Lambda handlers
+        run: |
+          python -m py_compile backend/functions/submit_review/handler.py
+          python -m py_compile backend/functions/get_insights/handler.py
+          python -m py_compile backend/functions/auth_otp/handler.py
+          python -m py_compile backend/functions/ai_processor/handler.py
+          echo "All handlers valid"
+
+      - name: Set up Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Frontend build test
+        run: cd frontend && npm install && npm run build
+        env:
+          CI: false
+          REACT_APP_API_URL: https://oj6pwu8j86.execute-api.ca-central-1.amazonaws.com/dev
