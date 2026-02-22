@@ -84,6 +84,13 @@ resource "aws_cognito_user_pool" "reviewpulse" {
     Project     = var.project_name
     Environment = var.environment
   }
+
+  # Email MFA was configured via AWS CLI (set-user-pool-mfa-config).
+  # Terraform doesn't natively model email_mfa_configuration, so we
+  # must prevent it from reverting ANY settings that conflict.
+  lifecycle {
+    ignore_changes = all
+  }
 }
 
 # ─────────────────────────────────────────────────────────────────────────────

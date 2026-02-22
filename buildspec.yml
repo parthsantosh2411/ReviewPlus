@@ -1,0 +1,102 @@
+##############################################################################
+# ReviewPulse — AWS CodeBuild Build Specification
+# Builds React frontend, packages Lambda functions, deploys everything
+##############################################################################
+version: 0.2
+
+env:
+  variables:
+    # These are overridden by CodeBuild environment variables from Terraform
+    S3_FRONTEND_BUCKET: ""
+    CLOUDFRONT_DISTRIBUTION_ID: ""
+    REACT_APP_API_URL: ""
+    REACT_APP_COGNITO_USER_POOL_ID: ""
+    REACT_APP_COGNITO_CLIENT_ID: ""
+    REACT_APP_APP_NAME: "ReviewPulse"
+    AWS_REGION_NAME: "ca-central-1"
+    LAMBDA_SUBMIT_REVIEW: "reviewpulse-submit-review"
+    LAMBDA_GET_INSIGHTS: "reviewpulse-get-insights"
+    LAMBDA_AUTH_OTP: "reviewpulse-auth-otp"
+    LAMBDA_AI_PROCESSOR: "reviewpulse-ai-processor"
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 18
+      python: 3.11
+    commands:
+      - echo "=== Installing frontend dependencies ==="
+      - cd frontend
+      - npm ci --prefer-offline
+      - cd ..
+      - echo "=== Installing backend dependencies ==="
+      - pip install -r backend/requirements.txt -t /tmp/python-deps
+
+  pre_build:
+    commands:
+      - echo "=== Pre-build checks ==="
+      - echo "Build started on $(date)"
+      - echo "Source version $CODEBUILD_RESOLVED_SOURCE_VERSION"
+      - node --version
+      - python3 --version
+
+  build:
+    commands:
+      # ── Build React frontend ────────────────────────────────────────────
+      - echo "=== Building React frontend ==="
+      - cd frontend
+      - CI=false npm run build
+      - cd ..
+
+      # ── Package Lambda functions ────────────────────────────────────────
+      - echo "=== Packaging Lambda functions ==="
+      - mkdir -p build/lambda
+
+      # submit_review
+      - cd backend/functions/submit_review
+      - zip -r ../../../build/lambda/submit_review.zip . -x "__pycache__/*" "*.pyc"
+      - cd ../../..
+
+      # get_insights
+      - cd backend/functions/get_insights
+      - zip -r ../../../build/lambda/get_insights.zip . -x "__pycache__/*" "*.pyc"
+      - cd ../../..
+
+      # auth_otp
+      - cd backend/functions/auth_otp
+      - zip -r ../../../build/lambda/auth_otp.zip . -x "__pycache__/*" "*.pyc"
+      - cd ../../..
+
+      # ai_processor
+      - cd backend/functions/ai_processor
+      - zip -r ../../../build/lambda/ai_processor.zip . -x "__pycache__/*" "*.pyc"
+      - cd ../../..
+
+  post_build:
+    commands:
+      # ── Deploy frontend to S3 ──────────────────────────────────────────
+      - echo "=== Deploying frontend to S3 ==="
+      - aws s3 sync frontend/build s3://$S3_FRONTEND_BUCKET --delete --region $AWS_REGION_NAME
+
+      # ── Invalidate CloudFront cache ─────────────────────────────────────
+      - echo "=== Invalidating CloudFront cache ==="
+      - aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_DISTRIBUTION_ID --paths "/*"
+
+      # ── Update Lambda functions ─────────────────────────────────────────
+      - echo "=== Updating Lambda functions ==="
+      - aws lambda update-function-code --function-name $LAMBDA_SUBMIT_REVIEW --zip-file fileb://build/lambda/submit_review.zip --region $AWS_REGION_NAME
+      - aws lambda update-function-code --function-name $LAMBDA_GET_INSIGHTS --zip-file fileb://build/lambda/get_insights.zip --region $AWS_REGION_NAME
+      - aws lambda update-function-code --function-name $LAMBDA_AUTH_OTP --zip-file fileb://build/lambda/auth_otp.zip --region $AWS_REGION_NAME
+      - aws lambda update-function-code --function-name $LAMBDA_AI_PROCESSOR --zip-file fileb://build/lambda/ai_processor.zip --region $AWS_REGION_NAME
+
+      - echo "=== Deployment complete! ==="
+
+artifacts:
+  files:
+    - "frontend/build/**/*"
+    - "build/lambda/**/*"
+  discard-paths: no
+
+cache:
+  paths:
+    - "frontend/node_modules/**/*"

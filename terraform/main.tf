@@ -116,3 +116,29 @@ module "cloudfront" {
   s3_website_endpoint = module.s3.frontend_bucket_website_endpoint
   depends_on          = [module.s3]
 }
+
+# -----------------------------------------------------------------------------
+# 11. CI/CD — CodeBuild + CodePipeline (depends on: S3, CloudFront, API GW, Cognito)
+# -----------------------------------------------------------------------------
+module "cicd" {
+  source       = "./modules/cicd"
+  project_name = var.project_name
+  environment  = var.environment
+  aws_region   = var.aws_region
+
+  # Infrastructure references
+  frontend_bucket_name       = module.s3.frontend_bucket_name
+  frontend_bucket_arn        = module.s3.frontend_bucket_arn
+  cloudfront_distribution_id = module.cloudfront.cloudfront_distribution_id
+  api_gateway_url            = module.api_gateway.api_url
+  cognito_user_pool_id       = module.cognito.user_pool_id
+  cognito_client_id          = module.cognito.user_pool_client_id
+
+  depends_on = [
+    module.s3,
+    module.cloudfront,
+    module.api_gateway,
+    module.cognito,
+    module.lambda
+  ]
+}

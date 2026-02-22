@@ -60,3 +60,24 @@ output "cloudfront_domain" {
   value       = module.cloudfront.cloudfront_domain_name
 }
 
+# ─── CI/CD outputs ───────────────────────────────────────────────────────────
+output "codepipeline_name" {
+  description = "Name of the CodePipeline"
+  value       = module.cicd.codepipeline_name
+}
+
+output "codebuild_project_name" {
+  description = "Name of the CodeBuild project"
+  value       = module.cicd.codebuild_project_name
+}
+
+output "pipeline_source_bucket" {
+  description = "S3 bucket for pipeline source uploads (upload source.zip here to trigger pipeline)"
+  value       = module.cicd.pipeline_source_bucket
+}
+
+output "pipeline_artifacts_bucket" {
+  description = "S3 bucket for pipeline artifacts"
+  value       = module.cicd.pipeline_artifacts_bucket
+}
+
