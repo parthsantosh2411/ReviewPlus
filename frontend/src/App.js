@@ -21,7 +21,7 @@ const darkTheme = createTheme({
     background: { default: '#0F0E17', paper: '#1A1926' },
   },
   typography: {
-    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
   },
 });
 

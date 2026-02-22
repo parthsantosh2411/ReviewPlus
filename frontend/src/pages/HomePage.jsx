@@ -124,8 +124,8 @@ const useInView = (threshold = 0.15) => {
     const el = ref.current;
     if (!el) return;
     const obs = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) setInView(true); },
-      { threshold },
+      ([entry]) => { setInView(entry.isIntersecting); },
+      { threshold, rootMargin: '0px 0px -40px 0px' },
     );
     obs.observe(el);
     return () => obs.disconnect();
@@ -169,11 +169,11 @@ const ScrollProgress = () => {
   }, []);
   return (
     <Box sx={{
-      position: 'fixed', top: 0, left: 0, height: 3, zIndex: 9999,
+      position: 'fixed', top: 0, left: 0, height: 2, zIndex: 9999,
       width: `${progress}%`,
-      background: 'linear-gradient(90deg, #6C63FF, #EC4899, #06B6D4)',
-      transition: 'width 0.1s linear',
-      boxShadow: '0 0 12px rgba(108,99,255,0.5)',
+      background: 'linear-gradient(90deg, #6C63FF 0%, #A78BFA 30%, #EC4899 60%, #06B6D4 100%)',
+      transition: 'width 0.08s linear',
+      boxShadow: '0 0 20px rgba(108,99,255,0.6), 0 0 40px rgba(108,99,255,0.2)',
     }} />
   );
 };
@@ -272,10 +272,10 @@ const HeroSection = () => {
               transition: 'all 0.8s 0.1s cubic-bezier(0.16,1,0.3,1)',
             }}>
               <Box sx={{ width: 7, height: 7, borderRadius: '50%', background: '#22C55E', boxShadow: '0 0 8px rgba(34,197,94,0.5)', animation: 'credPulse 2s ease-in-out infinite' }} />
-              <Typography sx={{ color: 'rgba(255,255,255,0.5)', fontWeight: 500, fontSize: '0.82rem', letterSpacing: '0.02em' }}>
+              <Typography sx={{ color: 'rgba(255,255,255,0.5)', fontWeight: 500, fontSize: '0.8rem', letterSpacing: '0.04em' }}>
                 Trusted by B2C Brands
               </Typography>
-              <AutoAwesomeIcon sx={{ fontSize: 13, color: 'rgba(255,255,255,0.25)' }} />
+              <AutoAwesomeIcon sx={{ fontSize: 13, color: 'rgba(108,99,255,0.5)' }} />
             </Box>
 
             {/* CRED-style massive headline — word-by-word reveal */}
@@ -320,13 +320,13 @@ const HeroSection = () => {
 
             {/* Sub-headline — cinematic line */}
             <Box sx={{
-              maxWidth: 520, mb: 5,
+              maxWidth: 540, mb: 5,
               opacity: loaded ? 1 : 0, transform: loaded ? 'none' : 'translateY(40px)',
               transition: 'all 0.9s 0.9s cubic-bezier(0.16,1,0.3,1)',
             }}>
               <Typography sx={{
-                color: 'rgba(255,255,255,0.4)', fontWeight: 400,
-                fontSize: { xs: '1rem', md: '1.18rem' }, lineHeight: 1.8,
+                color: 'rgba(255,255,255,0.42)', fontWeight: 400,
+                fontSize: { xs: '1.02rem', md: '1.2rem' }, lineHeight: 1.85,
                 letterSpacing: '0.01em',
               }}>
                 ReviewPulse sends secure 72-hour review links to your verified
@@ -347,18 +347,19 @@ const HeroSection = () => {
                 sx={{
                   background: '#fff', color: '#0F0E17',
                   textTransform: 'none', fontWeight: 700, fontSize: '1.05rem',
-                  px: 5, py: 1.8, borderRadius: '16px',
-                  boxShadow: '0 0 0 0 rgba(255,255,255,0)',
+                  px: 5, py: 1.8, borderRadius: '14px',
+                  boxShadow: '0 8px 32px rgba(255,255,255,0.08)',
                   position: 'relative', overflow: 'hidden',
+                  border: '1px solid rgba(255,255,255,0.08)',
                   '&::before': {
                     content: '""', position: 'absolute', top: 0, left: '-100%',
                     width: '100%', height: '100%',
-                    background: 'linear-gradient(90deg, transparent, rgba(108,99,255,0.08), transparent)',
+                    background: 'linear-gradient(90deg, transparent, rgba(108,99,255,0.1), transparent)',
                     animation: 'credShimmer 3s ease-in-out infinite',
                   },
                   '&:hover': {
                     background: '#fff',
-                    boxShadow: '0 20px 60px rgba(255,255,255,0.15), 0 0 0 1px rgba(255,255,255,0.1)',
+                    boxShadow: '0 24px 64px rgba(255,255,255,0.18), 0 0 0 1px rgba(255,255,255,0.15)',
                     transform: 'translateY(-3px) scale(1.02)',
                   },
                   transition: 'all 0.4s cubic-bezier(0.16,1,0.3,1)',
@@ -476,13 +477,16 @@ const DashboardPreviewCard = ({ loaded }) => {
           }} />
 
           {/* Title bar */}
-          <Box sx={{ display: 'flex', gap: 0.7, mb: 3, transform: 'translateZ(20px)' }}>
+          <Box sx={{ display: 'flex', gap: 0.7, mb: 3, transform: 'translateZ(20px)', alignItems: 'center' }}>
             {['#FF5F57', '#FEBD2E', '#27C840'].map((c) => (
-              <Box key={c} sx={{ width: 9, height: 9, borderRadius: '50%', background: c, opacity: 0.8 }} />
+              <Box key={c} sx={{ width: 10, height: 10, borderRadius: '50%', background: c, opacity: 0.85, boxShadow: `0 0 6px ${c}40` }} />
             ))}
+            <Typography sx={{ color: 'rgba(255,255,255,0.15)', ml: 1.5, fontSize: '0.55rem', fontWeight: 500, letterSpacing: 1 }}>
+              reviewpulse.app
+            </Typography>
           </Box>
 
-          <Typography sx={{ color: 'rgba(255,255,255,0.25)', letterSpacing: 3, fontSize: '0.6rem', fontWeight: 600, mb: 2, transform: 'translateZ(15px)' }}>
+          <Typography sx={{ color: 'rgba(255,255,255,0.2)', letterSpacing: 3, fontSize: '0.58rem', fontWeight: 600, mb: 2, transform: 'translateZ(15px)' }}>
             DASHBOARD PREVIEW
           </Typography>
 
@@ -549,10 +553,10 @@ const MarqueeSection = () => {
   const items = ['Verified Reviews', 'AI Sentiment Analysis', '72-Hour Secure Links', 'Brand Analytics', 'Anti-Fraud', 'Real-Time Insights', 'Order-Verified Only'];
   return (
     <Box sx={{
-      py: 3, overflow: 'hidden', position: 'relative',
-      borderTop: '1px solid rgba(255,255,255,0.04)',
-      borderBottom: '1px solid rgba(255,255,255,0.04)',
-      background: 'rgba(255,255,255,0.01)',
+      py: 3.5, overflow: 'hidden', position: 'relative',
+      borderTop: '1px solid rgba(255,255,255,0.03)',
+      borderBottom: '1px solid rgba(255,255,255,0.03)',
+      background: 'linear-gradient(180deg, rgba(108,99,255,0.02) 0%, transparent 100%)',
     }}>
       <Box sx={{
         display: 'flex', whiteSpace: 'nowrap',
@@ -560,8 +564,8 @@ const MarqueeSection = () => {
       }}>
         {[...items, ...items].map((item, i) => (
           <Box key={i} sx={{ display: 'flex', alignItems: 'center', mx: 4 }}>
-            <Box sx={{ width: 5, height: 5, borderRadius: '50%', background: '#6C63FF', opacity: 0.4, mr: 2 }} />
-            <Typography sx={{ color: 'rgba(255,255,255,0.18)', fontSize: '0.85rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+            <Box sx={{ width: 5, height: 5, borderRadius: '50%', background: '#6C63FF', opacity: 0.35, mr: 2, boxShadow: '0 0 6px rgba(108,99,255,0.3)' }} />
+            <Typography sx={{ color: 'rgba(255,255,255,0.15)', fontSize: '0.82rem', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
               {item}
             </Typography>
           </Box>
@@ -602,11 +606,11 @@ const FEATURES = [
 ];
 
 const FeatureRow = ({ feature, index, isReversed }) => {
-  const [ref, inView] = useInView(0.15);
+  const [ref, inView] = useInView(0.12);
   const [hover, setHover] = useState(false);
 
   return (
-    <Box ref={ref} sx={{ py: { xs: 6, md: 10 } }}>
+    <Box ref={ref} sx={{ py: { xs: 8, md: 12 } }}>
       <Container maxWidth="lg">
         <Grid container spacing={{ xs: 4, md: 8 }} alignItems="center" direction={isReversed ? 'row-reverse' : 'row'}>
           {/* Text side */}
@@ -669,11 +673,12 @@ const FeatureRow = ({ feature, index, isReversed }) => {
               onMouseLeave={() => setHover(false)}
               sx={{
                 width: { xs: 220, md: 280 }, height: { xs: 220, md: 280 },
-                borderRadius: '32px', position: 'relative',
+                borderRadius: '28px', position: 'relative',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: `radial-gradient(circle at 30% 30%, ${feature.tagColor}10, transparent 70%)`,
-                border: `1px solid ${hover ? feature.tagColor + '25' : 'rgba(255,255,255,0.04)'}`,
-                boxShadow: hover ? `0 30px 80px rgba(0,0,0,0.3), 0 0 40px ${feature.tagColor}08` : '0 10px 40px rgba(0,0,0,0.15)',
+                background: `radial-gradient(circle at 30% 30%, ${feature.tagColor}0D, transparent 70%)`,
+                backdropFilter: 'blur(20px)',
+                border: `1px solid ${hover ? feature.tagColor + '30' : 'rgba(255,255,255,0.05)'}`,
+                boxShadow: hover ? `0 30px 80px rgba(0,0,0,0.35), 0 0 60px ${feature.tagColor}0A` : '0 10px 40px rgba(0,0,0,0.2)',
                 transform: inView
                   ? (hover ? 'translateY(-8px) scale(1.02)' : 'none')
                   : (isReversed ? 'translateX(-60px)' : 'translateX(60px)'),
@@ -777,9 +782,10 @@ const StatItem = ({ stat, index }) => {
 
 const StatsSection = () => (
   <Box sx={{
-    py: { xs: 6, md: 10 }, position: 'relative',
+    py: { xs: 8, md: 12 }, position: 'relative',
     borderTop: '1px solid rgba(255,255,255,0.04)',
     borderBottom: '1px solid rgba(255,255,255,0.04)',
+    background: 'linear-gradient(180deg, transparent 0%, rgba(108,99,255,0.015) 50%, transparent 100%)',
   }}>
     {/* Shimmer top line */}
     <Box sx={{
@@ -883,7 +889,7 @@ const TimelineStep = ({ step, index, isLast }) => {
 const HowItWorksSection = () => {
   const [ref, inView] = useInView(0.1);
   return (
-    <Box id="how-it-works" sx={{ py: { xs: 8, md: 14 }, position: 'relative' }}>
+    <Box id="how-it-works" sx={{ py: { xs: 10, md: 16 }, position: 'relative' }}>
       {/* Background orb */}
       <Box sx={{
         position: 'absolute', top: '20%', right: '-8%', width: 300, height: 300,
@@ -938,7 +944,7 @@ const CtaSection = () => {
   const navigate = useNavigate();
   return (
     <Box sx={{
-      py: { xs: 10, md: 16 }, position: 'relative', overflow: 'hidden',
+      py: { xs: 12, md: 18 }, position: 'relative', overflow: 'hidden',
       borderTop: '1px solid rgba(255,255,255,0.04)',
     }}>
       {/* Background glow */}
@@ -998,17 +1004,19 @@ const CtaSection = () => {
               sx={{
                 background: '#fff', color: '#0A0A12',
                 textTransform: 'none', fontWeight: 700, fontSize: '1.1rem',
-                px: 6, py: 2, borderRadius: '16px',
+                px: 6, py: 2, borderRadius: '14px',
+                border: '1px solid rgba(255,255,255,0.1)',
                 '&::before': {
                   content: '""', position: 'absolute', top: 0, left: '-100%',
                   width: '100%', height: '100%',
-                  background: 'linear-gradient(90deg, transparent, rgba(108,99,255,0.08), transparent)',
+                  background: 'linear-gradient(90deg, transparent, rgba(108,99,255,0.1), transparent)',
                   animation: 'credShimmer 3s ease-in-out infinite',
                 },
                 position: 'relative', overflow: 'hidden',
+                boxShadow: '0 8px 30px rgba(255,255,255,0.08)',
                 '&:hover': {
                   background: '#fff',
-                  boxShadow: '0 20px 60px rgba(255,255,255,0.12)',
+                  boxShadow: '0 24px 64px rgba(255,255,255,0.15)',
                   transform: 'translateY(-3px) scale(1.02)',
                 },
                 transition: 'all 0.4s cubic-bezier(0.16,1,0.3,1)',
@@ -1028,7 +1036,7 @@ const CtaSection = () => {
    ═══════════════════════════════════════════════════════════════════════════ */
 const HomePage = () => {
   return (
-    <Box sx={{ background: '#0A0A12', minHeight: '100vh', position: 'relative' }}>
+    <Box sx={{ background: '#0A0A12', minHeight: '100vh', position: 'relative', overflowX: 'hidden' }}>
       <style>{credKeyframes}</style>
       <ScrollProgress />
       <CinematicParticles />
