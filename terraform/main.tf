@@ -54,6 +54,9 @@ module "lambda" {
   brands_table_name   = module.dynamodb.brands_table_name
   links_table_name    = module.dynamodb.review_links_table_name
   ses_from_email      = "tripathiparth2411@gmail.com"
+  cognito_user_pool_id = module.cognito.user_pool_id
+  cognito_client_id    = module.cognito.user_pool_client_id
+  cloudfront_url       = module.cloudfront.cloudfront_url
 }
 
 # -----------------------------------------------------------------------------
@@ -92,4 +95,24 @@ module "xray" {
   api_gateway_id     = module.api_gateway.api_id
   api_gateway_stage  = "dev"
   notification_email = "tripathiparth2411@gmail.com"
+}
+
+# -----------------------------------------------------------------------------
+# 9. Cognito (replaces custom JWT auth)
+# -----------------------------------------------------------------------------
+module "cognito" {
+  source       = "./modules/cognito"
+  project_name = var.project_name
+  environment  = var.environment
+}
+
+# -----------------------------------------------------------------------------
+# 10. CloudFront (fronts S3 website endpoint — NO OAC / NO OAI)
+# -----------------------------------------------------------------------------
+module "cloudfront" {
+  source              = "./modules/cloudfront"
+  project_name        = var.project_name
+  environment         = var.environment
+  s3_website_endpoint = module.s3.frontend_bucket_website_endpoint
+  depends_on          = [module.s3]
 }

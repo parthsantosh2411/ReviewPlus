@@ -1,14 +1,11 @@
 import json
 import os
 import uuid
-import random
+import base64
 import time
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 
 import boto3
-from boto3.dynamodb.conditions import Attr
-from passlib.hash import bcrypt
-from jose import jwt
 from aws_xray_sdk.core import xray_recorder, patch_all
 
 # Patch all supported libraries (boto3, requests, etc.) for X-Ray tracing
@@ -17,17 +14,18 @@ patch_all()
 # ---------------------------------------------------------------------------
 # Environment variables
 # ---------------------------------------------------------------------------
-USERS_TABLE = os.environ.get("DYNAMODB_TABLE_USERS", "reviewpulse-users")
 LINKS_TABLE = os.environ.get("DYNAMODB_TABLE_LINKS", "reviewpulse-review-links")
 SES_FROM_EMAIL = os.environ.get("SES_FROM_EMAIL", "tripathiparth2411@gmail.com")
-JWT_SECRET = os.environ.get("JWT_SECRET", "reviewpulse-dev-secret-change-me")
+COGNITO_CLIENT_ID = os.environ.get("COGNITO_CLIENT_ID", "")
+COGNITO_USER_POOL_ID = os.environ.get("COGNITO_USER_POOL_ID", "")
 REGION = os.environ.get("AWS_REGION_NAME", "ca-central-1")
 API_URL = os.environ.get("API_URL", "")  # set after deploy if needed
+CLOUDFRONT_URL = os.environ.get("CLOUDFRONT_URL", "")  # frontend origin
 ENVIRONMENT = os.environ.get("ENVIRONMENT", "dev")
 
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
 ses_client = boto3.client("ses", region_name=REGION)
-users_table = dynamodb.Table(USERS_TABLE)
+cognito = boto3.client("cognito-idp", region_name=REGION)
 links_table = dynamodb.Table(LINKS_TABLE)
 
 CORS_HEADERS = {
@@ -47,40 +45,32 @@ def _response(status_code: int, body: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Helper: find user by email (scan — fine for small user base)
+# Helper: verify Cognito AccessToken via get_user API
 # ---------------------------------------------------------------------------
-def _find_user_by_email(email: str) -> dict | None:
-    with xray_recorder.in_subsegment("dynamodb-scan-user-by-email") as seg:
-        seg.put_annotation("table", USERS_TABLE)
-        seg.put_annotation("operation", "scan")
-        resp = users_table.scan(
-            FilterExpression=Attr("email").eq(email),
-            Limit=1,
-        )
-    items = resp.get("Items", [])
-    return items[0] if items else None
+def _verify_cognito_token(access_token: str) -> dict | None:
+    """Call Cognito get_user to verify an AccessToken. Returns user info or None."""
+    with xray_recorder.in_subsegment("cognito-verify-token") as seg:
+        seg.put_annotation("service", "cognito-idp")
+        seg.put_annotation("operation", "get_user")
+        try:
+            response = cognito.get_user(AccessToken=access_token)
+            return response
+        except Exception:
+            return None
 
 
-# ---------------------------------------------------------------------------
-# Helper: decode & verify JWT from Authorization header
-# ---------------------------------------------------------------------------
-def _verify_jwt(event: dict) -> dict | None:
+def _extract_bearer_token(event: dict) -> str | None:
+    """Extract Bearer token from Authorization header."""
     auth_header = (event.get("headers") or {}).get("Authorization", "")
     if not auth_header:
-        # also try lowercase (API GW may normalise)
         auth_header = (event.get("headers") or {}).get("authorization", "")
     if not auth_header:
         return None
-    token = auth_header.replace("Bearer ", "").strip()
-    try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
-        return payload
-    except Exception:
-        return None
+    return auth_header.replace("Bearer ", "").strip() or None
 
 
 # ===========================================================================
-# ROUTE 1 — POST /auth/login
+# ROUTE 1 — POST /auth/login  (Cognito USER_PASSWORD_AUTH)
 # ===========================================================================
 def _handle_login(body: dict) -> dict:
     email = body.get("email", "").strip().lower()
@@ -89,105 +79,105 @@ def _handle_login(body: dict) -> dict:
     if not email or not password:
         return _response(400, {"error": "email and password are required"})
 
-    user = _find_user_by_email(email)
-    if not user:
-        return _response(401, {"error": "Invalid credentials"})
-
-    # Verify password
-    stored_hash = user.get("passwordHash", "")
-    if not stored_hash or not bcrypt.verify(password, stored_hash):
-        return _response(401, {"error": "Invalid credentials"})
-
-    # Generate 6-digit OTP
-    otp_code = str(random.randint(100000, 999999))
-    otp_expiry = int(time.time()) + 600  # 10 minutes
-
-    # Store OTP in user record
-    with xray_recorder.in_subsegment("dynamodb-store-otp") as seg:
-        seg.put_annotation("table", USERS_TABLE)
-        seg.put_annotation("operation", "update_item")
-        users_table.update_item(
-            Key={"userId": user["userId"]},
-            UpdateExpression="SET otpCode = :otp, otpExpiry = :exp",
-            ExpressionAttributeValues={":otp": otp_code, ":exp": otp_expiry},
-        )
-
-    # Send OTP via SES
-    with xray_recorder.in_subsegment("ses-send-otp-email") as seg:
-        seg.put_annotation("service", "ses")
-        seg.put_annotation("email_type", "otp")
-        ses_client.send_email(
-            Source=SES_FROM_EMAIL,
-            Destination={"ToAddresses": [email]},
-            Message={
-                "Subject": {"Data": "Your ReviewPulse Login Code"},
-                "Body": {
-                    "Text": {
-                        "Data": f"Your verification code is: {otp_code}. Valid for 10 minutes."
-                    }
+    with xray_recorder.in_subsegment("cognito-initiate-auth") as seg:
+        seg.put_annotation("service", "cognito-idp")
+        seg.put_annotation("operation", "initiate_auth")
+        try:
+            response = cognito.initiate_auth(
+                AuthFlow="USER_PASSWORD_AUTH",
+                AuthParameters={
+                    "USERNAME": email,
+                    "PASSWORD": password,
                 },
-            },
-        )
+                ClientId=COGNITO_CLIENT_ID,
+            )
+        except cognito.exceptions.NotAuthorizedException:
+            return _response(401, {"error": "Invalid credentials"})
+        except cognito.exceptions.UserNotFoundException:
+            return _response(401, {"error": "Invalid credentials"})
+        except cognito.exceptions.UserNotConfirmedException:
+            return _response(403, {"error": "User email not confirmed"})
+        except Exception as exc:
+            print(f"[COGNITO ERROR] initiate_auth: {exc}")
+            return _response(500, {"error": "Authentication service error"})
 
+    # Check if MFA challenge is required
+    challenge = response.get("ChallengeName")
+    if challenge == "SMS_MFA":
+        seg.put_annotation("mfa_required", True)
+        return _response(200, {
+            "message": "OTP sent to your registered phone",
+            "challengeName": "SMS_MFA",
+            "session": response["Session"],
+            "email": email,
+        })
+
+    # No MFA — return tokens directly
+    auth_result = response.get("AuthenticationResult", {})
     return _response(200, {
-        "message": "OTP sent to your email",
-        "userId": user["userId"],
+        "message": "Login successful",
+        "accessToken": auth_result.get("AccessToken"),
+        "idToken": auth_result.get("IdToken"),
+        "refreshToken": auth_result.get("RefreshToken"),
     })
 
 
 # ===========================================================================
-# ROUTE 2 — POST /auth/verify
+# ROUTE 2 — POST /auth/verify  (Cognito SMS_MFA challenge response)
 # ===========================================================================
 def _handle_verify(body: dict) -> dict:
-    user_id = body.get("userId", "").strip()
+    session = body.get("session", "").strip()
     otp_code = body.get("otpCode", "").strip()
+    email = body.get("email", "").strip().lower()
 
-    if not user_id or not otp_code:
-        return _response(400, {"error": "userId and otpCode are required"})
+    if not session or not otp_code or not email:
+        return _response(400, {"error": "session, otpCode, and email are required"})
 
-    with xray_recorder.in_subsegment("dynamodb-get-user") as seg:
-        seg.put_annotation("table", USERS_TABLE)
-        seg.put_annotation("operation", "get_item")
-        resp = users_table.get_item(Key={"userId": user_id})
-    user = resp.get("Item")
-    if not user:
-        return _response(401, {"error": "Invalid credentials"})
+    with xray_recorder.in_subsegment("cognito-respond-to-challenge") as seg:
+        seg.put_annotation("service", "cognito-idp")
+        seg.put_annotation("operation", "respond_to_auth_challenge")
+        try:
+            response = cognito.respond_to_auth_challenge(
+                ClientId=COGNITO_CLIENT_ID,
+                ChallengeName="SMS_MFA",
+                Session=session,
+                ChallengeResponses={
+                    "USERNAME": email,
+                    "SMS_MFA_CODE": otp_code,
+                },
+            )
+        except cognito.exceptions.CodeMismatchException:
+            return _response(401, {"error": "Invalid OTP code"})
+        except cognito.exceptions.ExpiredCodeException:
+            return _response(401, {"error": "OTP code expired. Please login again."})
+        except Exception as exc:
+            print(f"[COGNITO ERROR] respond_to_auth_challenge: {exc}")
+            return _response(500, {"error": "Verification service error"})
 
-    stored_otp = user.get("otpCode", "")
-    otp_expiry = int(user.get("otpExpiry", 0))
+    auth_result = response.get("AuthenticationResult", {})
+    id_token = auth_result.get("IdToken", "")
 
-    if stored_otp != otp_code:
-        return _response(401, {"error": "Invalid OTP code"})
-
-    if int(time.time()) > otp_expiry:
-        return _response(401, {"error": "OTP has expired"})
-
-    # Clear OTP fields
-    with xray_recorder.in_subsegment("dynamodb-clear-otp") as seg:
-        seg.put_annotation("table", USERS_TABLE)
-        seg.put_annotation("operation", "update_item")
-        users_table.update_item(
-            Key={"userId": user_id},
-            UpdateExpression="REMOVE otpCode, otpExpiry",
-        )
-
-    # Generate JWT (24-hour expiry)
-    now = datetime.now(timezone.utc)
-    payload = {
-        "userId": user_id,
-        "email": user.get("email", ""),
-        "role": user.get("role", "viewer"),
-        "brandId": user.get("brandId", ""),
-        "exp": int((now + timedelta(hours=24)).timestamp()),
-        "iat": int(now.timestamp()),
-    }
-    token = jwt.encode(payload, JWT_SECRET, algorithm="HS256")
+    # Decode IdToken payload to extract custom attributes
+    role = "viewer"
+    brand_id = ""
+    if id_token:
+        try:
+            payload_part = id_token.split(".")[1]
+            payload_part += "=" * (4 - len(payload_part) % 4)
+            decoded = json.loads(base64.b64decode(payload_part))
+            role = decoded.get("custom:role", "viewer")
+            brand_id = decoded.get("custom:brandId", "")
+        except Exception:
+            pass  # fallback to defaults
 
     return _response(200, {
-        "token": token,
-        "role": user.get("role", "viewer"),
-        "brandId": user.get("brandId", ""),
-        "email": user.get("email", ""),
+        "message": "OTP verified successfully",
+        "accessToken": auth_result.get("AccessToken"),
+        "idToken": id_token,
+        "refreshToken": auth_result.get("RefreshToken"),
+        "role": role,
+        "brandId": brand_id,
+        "email": email,
     })
 
 
@@ -195,10 +185,14 @@ def _handle_verify(body: dict) -> dict:
 # ROUTE 3 — POST /auth/send-review-link
 # ===========================================================================
 def _handle_send_review_link(event: dict, body: dict) -> dict:
-    # Verify JWT
-    caller = _verify_jwt(event)
+    # Verify Cognito AccessToken
+    access_token = _extract_bearer_token(event)
+    if not access_token:
+        return _response(401, {"error": "Unauthorized — Bearer token required"})
+
+    caller = _verify_cognito_token(access_token)
     if not caller:
-        return _response(401, {"error": "Unauthorized — valid JWT required"})
+        return _response(401, {"error": "Unauthorized — invalid or expired token"})
 
     customer_email = body.get("customerEmail", "").strip()
     customer_phone = body.get("customerPhone", "").strip()
@@ -235,8 +229,9 @@ def _handle_send_review_link(event: dict, body: dict) -> dict:
             "expiresAt": expires_at,
         })
 
-    # Build the review URL
-    review_url = f"{API_URL}/review/{link_token}" if API_URL else f"/review/{link_token}"
+    # Build the review URL (frontend page served by CloudFront)
+    base_url = CLOUDFRONT_URL or API_URL
+    review_url = f"{base_url}/review/{link_token}" if base_url else f"/review/{link_token}"
 
     # Send email via SES
     email_body = (

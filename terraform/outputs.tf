@@ -38,3 +38,25 @@ output "sns_topic_arn" {
   value       = module.xray.sns_topic_arn
 }
 
+# ─── Cognito outputs ─────────────────────────────────────────────────────────
+output "cognito_user_pool_id" {
+  description = "ID of the Cognito User Pool"
+  value       = module.cognito.user_pool_id
+}
+
+output "cognito_client_id" {
+  description = "ID of the Cognito User Pool Client"
+  value       = module.cognito.user_pool_client_id
+}
+
+# ─── CloudFront outputs ─────────────────────────────────────────────────────
+output "cloudfront_url" {
+  description = "Full HTTPS URL of the CloudFront distribution"
+  value       = module.cloudfront.cloudfront_url
+}
+
+output "cloudfront_domain" {
+  description = "Domain name of the CloudFront distribution"
+  value       = module.cloudfront.cloudfront_domain_name
+}
+

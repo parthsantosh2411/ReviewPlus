@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { Box, CircularProgress } from '@mui/material';
 
 const PrivateRoute = ({ children }) => {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -25,6 +25,15 @@ const PrivateRoute = ({ children }) => {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // Role-based route guard
+  const path = location.pathname;
+  if (user?.role === 'superadmin' && path.startsWith('/dashboard')) {
+    return <Navigate to="/superadmin" replace />;
+  }
+  if (user?.role !== 'superadmin' && path.startsWith('/superadmin')) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return children;

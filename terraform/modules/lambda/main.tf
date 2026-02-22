@@ -53,6 +53,9 @@ resource "aws_lambda_function" "submit_review" {
       REVIEW_LINKS_TABLE      = var.links_table_name
       AWS_REGION_NAME         = "ca-central-1"
       ENVIRONMENT             = var.environment
+      COGNITO_USER_POOL_ID    = var.cognito_user_pool_id
+      COGNITO_CLIENT_ID       = var.cognito_client_id
+      CLOUDFRONT_URL          = var.cloudfront_url
     }
   }
 
@@ -88,6 +91,9 @@ resource "aws_lambda_function" "get_insights" {
       DYNAMODB_TABLE_LINKS    = var.links_table_name
       AWS_REGION_NAME         = "ca-central-1"
       ENVIRONMENT             = var.environment
+      COGNITO_USER_POOL_ID    = var.cognito_user_pool_id
+      COGNITO_CLIENT_ID       = var.cognito_client_id
+      CLOUDFRONT_URL          = var.cloudfront_url
     }
   }
 
@@ -124,6 +130,9 @@ resource "aws_lambda_function" "auth_otp" {
       SES_FROM_EMAIL          = var.ses_from_email
       AWS_REGION_NAME         = "ca-central-1"
       ENVIRONMENT             = var.environment
+      COGNITO_USER_POOL_ID    = var.cognito_user_pool_id
+      COGNITO_CLIENT_ID       = var.cognito_client_id
+      CLOUDFRONT_URL          = var.cloudfront_url
     }
   }
 
@@ -160,6 +169,9 @@ resource "aws_lambda_function" "ai_processor" {
       BEDROCK_MODEL_ID        = "anthropic.claude-v2"
       AWS_REGION_NAME         = "ca-central-1"
       ENVIRONMENT             = var.environment
+      COGNITO_USER_POOL_ID    = var.cognito_user_pool_id
+      COGNITO_CLIENT_ID       = var.cognito_client_id
+      CLOUDFRONT_URL          = var.cloudfront_url
     }
   }
 

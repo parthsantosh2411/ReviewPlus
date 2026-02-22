@@ -1,6 +1,9 @@
 # Dependencies
 node_modules/
 
+# Build artifacts
+build/
+
 # Terraform
 .terraform/
 *.tfstate

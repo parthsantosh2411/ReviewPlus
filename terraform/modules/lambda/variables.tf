@@ -42,3 +42,18 @@ variable "ses_from_email" {
   description = "Verified SES sender email address"
   type        = string
 }
+
+variable "cognito_user_pool_id" {
+  description = "ID of the Cognito User Pool"
+  type        = string
+}
+
+variable "cognito_client_id" {
+  description = "ID of the Cognito User Pool Client"
+  type        = string
+}
+
+variable "cloudfront_url" {
+  description = "CloudFront distribution URL"
+  type        = string
+}

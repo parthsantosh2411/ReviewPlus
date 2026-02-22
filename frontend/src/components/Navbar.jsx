@@ -76,7 +76,7 @@ const Navbar = () => {
             <img
               src="/logo2.png"
               alt="ReviewPulse"
-              height="36px"
+              height="52px"
               style={{ marginRight: 8 }}
             />
           </Box>

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { fetchAuthSession } from 'aws-amplify/auth';
 
 const api = axios.create({
   baseURL: process.env.REACT_APP_API_URL || 'http://localhost:3000/dev',
@@ -8,12 +9,17 @@ const api = axios.create({
   },
 });
 
-// Request interceptor — attach JWT token from localStorage
+// Request interceptor — attach Cognito access token
 api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('reviewpulse_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+  async (config) => {
+    try {
+      const session = await fetchAuthSession();
+      const token = session.tokens?.accessToken?.toString();
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    } catch {
+      // No active session — proceed without token
     }
     return config;
   },
@@ -25,8 +31,6 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
-      localStorage.removeItem('reviewpulse_token');
-      localStorage.removeItem('reviewpulse_user');
       // Redirect to login if not already there
       if (window.location.pathname !== '/login') {
         window.location.href = '/login';

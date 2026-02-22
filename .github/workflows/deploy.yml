@@ -45,6 +45,8 @@ jobs:
         run: cd frontend && npm run build
         env:
           REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL }}
+          REACT_APP_COGNITO_USER_POOL_ID: ${{ secrets.COGNITO_USER_POOL_ID }}
+          REACT_APP_COGNITO_CLIENT_ID: ${{ secrets.COGNITO_CLIENT_ID }}
           CI: false
 
       - name: Upload build artifact
@@ -64,6 +66,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -76,47 +83,64 @@ jobs:
           aws sts get-caller-identity
           echo "AWS connection verified"
 
+      - name: Install shared Lambda dependencies
+        run: |
+          pip install \
+            aws-xray-sdk \
+            "python-jose[cryptography]" \
+            bcrypt \
+            -t build/deps \
+            --platform manylinux2014_x86_64 \
+            --python-version 3.11 \
+            --only-binary=:all: \
+            --upgrade
+          echo "Dependencies installed to build/deps"
+
       - name: Package and deploy submit_review Lambda
         run: |
-          cd backend/functions/submit_review
-          zip -r ../../../submit_review.zip .
-          cd ../../..
+          mkdir -p build/submit_review
+          cp -r build/deps/* build/submit_review/
+          cp backend/functions/submit_review/handler.py build/submit_review/
+          cd build/submit_review && zip -r ../submit_review.zip . && cd ../..
           aws lambda update-function-code \
             --function-name reviewpulse-submit-review \
-            --zip-file fileb://submit_review.zip \
+            --zip-file fileb://build/submit_review.zip \
             --region ca-central-1
           echo "submit_review Lambda deployed successfully"
 
       - name: Package and deploy get_insights Lambda
         run: |
-          cd backend/functions/get_insights
-          zip -r ../../../get_insights.zip .
-          cd ../../..
+          mkdir -p build/get_insights
+          cp -r build/deps/* build/get_insights/
+          cp backend/functions/get_insights/handler.py build/get_insights/
+          cd build/get_insights && zip -r ../get_insights.zip . && cd ../..
           aws lambda update-function-code \
             --function-name reviewpulse-get-insights \
-            --zip-file fileb://get_insights.zip \
+            --zip-file fileb://build/get_insights.zip \
             --region ca-central-1
           echo "get_insights Lambda deployed successfully"
 
       - name: Package and deploy auth_otp Lambda
         run: |
-          cd backend/functions/auth_otp
-          zip -r ../../../auth_otp.zip .
-          cd ../../..
+          mkdir -p build/auth_otp
+          cp -r build/deps/* build/auth_otp/
+          cp backend/functions/auth_otp/handler.py build/auth_otp/
+          cd build/auth_otp && zip -r ../auth_otp.zip . && cd ../..
           aws lambda update-function-code \
             --function-name reviewpulse-auth-otp \
-            --zip-file fileb://auth_otp.zip \
+            --zip-file fileb://build/auth_otp.zip \
             --region ca-central-1
           echo "auth_otp Lambda deployed successfully"
 
       - name: Package and deploy ai_processor Lambda
         run: |
-          cd backend/functions/ai_processor
-          zip -r ../../../ai_processor.zip .
-          cd ../../..
+          mkdir -p build/ai_processor
+          cp -r build/deps/* build/ai_processor/
+          cp backend/functions/ai_processor/handler.py build/ai_processor/
+          cd build/ai_processor && zip -r ../ai_processor.zip . && cd ../..
           aws lambda update-function-code \
             --function-name reviewpulse-ai-processor \
-            --zip-file fileb://ai_processor.zip \
+            --zip-file fileb://build/ai_processor.zip \
             --region ca-central-1
           echo "ai_processor Lambda deployed successfully"
 
@@ -168,6 +192,8 @@ jobs:
         run: cd frontend && npm install && npm run build
         env:
           REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL }}
+          REACT_APP_COGNITO_USER_POOL_ID: ${{ secrets.COGNITO_USER_POOL_ID }}
+          REACT_APP_COGNITO_CLIENT_ID: ${{ secrets.COGNITO_CLIENT_ID }}
           CI: false
 
       - name: Deploy to S3 bucket
@@ -210,7 +236,7 @@ jobs:
           echo "  Region:   ca-central-1"
           echo "  Commit:   ${{ github.sha }}"
           echo "  Lambdas:  4 functions updated"
-          echo "  Frontend: deployed to S3"
+          echo "  Frontend: deployed to S3 + CloudFront"
           echo "  API URL:  https://oj6pwu8j86.execute-api.ca-central-1.amazonaws.com/dev"
-          echo "  Site URL: http://reviewpulse-frontend-f020c3de.s3-website.ca-central-1.amazonaws.com"
+          echo "  Site URL: https://d1007l7izq5bn6.cloudfront.net"
           echo "================================================"

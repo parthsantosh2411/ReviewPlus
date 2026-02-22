@@ -22,7 +22,7 @@ const Footer = () => {
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <img src="/logo2.png" alt="ReviewPulse" height="28" />
+            <img src="/logo2.png" alt="ReviewPulse" height="40" />
           </Box>
           <Typography
             variant="body2"

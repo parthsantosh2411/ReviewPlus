@@ -177,10 +177,40 @@ def _handle_post_review(body: dict) -> dict:
         seg.put_annotation("feedback_id", feedback_id)
         feedback_table.put_item(Item=feedback_item)
 
-    return _response(201, {
+    # Fetch product AI summary to show on the thank-you page
+    ai_insights = None
+    product_id = item.get("productId", "")
+    brand_id = item.get("brandId", "")
+    if product_id and brand_id:
+        try:
+            with xray_recorder.in_subsegment("dynamodb-get-product-ai") as seg:
+                seg.put_annotation("table", PRODUCTS_TABLE)
+                seg.put_annotation("operation", "get_item")
+                prod_resp = products_table.get_item(
+                    Key={"productId": product_id, "brandId": brand_id}
+                )
+            prod_item = prod_resp.get("Item")
+            if prod_item and prod_item.get("ai_summary"):
+                ai_insights = {
+                    "ai_summary": prod_item.get("ai_summary", ""),
+                    "ai_strengths": prod_item.get("ai_strengths", []),
+                    "ai_weaknesses": prod_item.get("ai_weaknesses", []),
+                    "ai_recommendations": prod_item.get("ai_recommendations", []),
+                    "ai_sentiment_overview": prod_item.get("ai_sentiment_overview", ""),
+                    "ai_summary_review_count": int(prod_item.get("ai_summary_review_count", 0)),
+                    "product_name": prod_item.get("productName", ""),
+                }
+        except Exception:
+            pass  # non-critical — thank-you page still works without AI summary
+
+    response_body = {
         "message": "Review submitted successfully",
         "FeedbackId": feedback_id,
-    })
+    }
+    if ai_insights:
+        response_body["ai_insights"] = ai_insights
+
+    return _response(201, response_body)
 
 
 # ===========================================================================

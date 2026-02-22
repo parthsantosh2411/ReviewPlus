@@ -10,6 +10,7 @@ import OtpVerifyPage from './pages/OtpVerifyPage';
 import DashboardPage from './pages/DashboardPage';
 import ProductDashboardPage from './pages/ProductDashboardPage';
 import ReviewFormPage from './pages/ReviewFormPage';
+import SuperAdminDashboard from './pages/SuperAdminDashboard';
 import NotFoundPage from './pages/NotFoundPage';
 import './App.css';
 
@@ -59,6 +60,14 @@ function App() {
               element={
                 <PrivateRoute>
                   <ProductDashboardPage />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/superadmin"
+              element={
+                <PrivateRoute>
+                  <SuperAdminDashboard />
                 </PrivateRoute>
               }
             />
